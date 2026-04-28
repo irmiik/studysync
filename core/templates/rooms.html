@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h2 class="mb-4 text-center">Study Rooms</h2>
+
+<!-- SEARCH -->
+<form method="GET" class="mb-5" style="max-width: 500px; margin: auto;">
+    <input class="form-control form-control-lg shadow-sm" type="text" name="q" placeholder="🔍 Search rooms...">
+</form>
+
+<div class="row g-4">
+
+{% for room in rooms %}
+
+<div class="col-md-6">
+
+    <!-- 🔥 CARD -->
+    <div class="p-4 text-white" style="
+        border-radius: 15px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+    ">
+
+        <!-- TITLE -->
+        <h5 class="mb-2">{{ room.title }}</h5>
+
+        <!-- SUBJECT -->
+        <span class="badge bg-light text-dark mb-3">
+            {{ room.subject }}
+        </span>
+
+        <!-- DESCRIPTION -->
+        <p style="opacity: 0.9;">
+            {{ room.description }}
+        </p>
+
+        <!-- FAKE PARTICIPANTS (görsel efekt) -->
+        <div class="mb-3">
+            👥 {{ room.participants.count }} participants
+        </div>
+
+        <!-- BUTTON -->
+        <a href="/room/{{ room.id }}/" class="btn btn-light">
+            Join Room →
+        </a>
+
+    </div>
+
+</div>
+
+{% empty %}
+<p class="text-center">No rooms found.</p>
+{% endfor %}
+
+</div>
+
+{% endblock %}

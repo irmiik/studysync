@@ -1,0 +1,263 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h2>{{ room.title }}</h2>
+
+<hr>
+
+<div class="row">
+
+<!-- 👥 USERS -->
+<div class="col-md-3">
+    <h4>Participants</h4>
+    <div style="border:1px solid #ccc; padding:10px; height:300px; overflow-y:auto;">
+        {% for user in participants %}
+            <p>👤 {{ user.username }}</p>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- 📝 NOTES -->
+<div class="col-md-5">
+    <h4>Notes</h4>
+    <textarea id="notes" class="form-control" style="height:300px;">{{ notes }}</textarea>
+</div>
+
+<!-- 💬 CHAT -->
+<div class="col-md-4">
+
+    <h4>Chat</h4>
+
+    <div id="chatBox" style="height:200px; overflow-y:scroll; border:1px solid #ccc; padding:10px;">
+        {% for msg in messages %}
+            <p><strong>{{ msg.user.username }}:</strong> {{ msg.content }}</p>
+        {% endfor %}
+    </div>
+
+    <form id="chatForm" class="mt-2">
+        {% csrf_token %}
+        <input id="chatInput" type="text" class="form-control" placeholder="Write message...">
+        <button type="button" onclick="sendMessage()" class="btn btn-primary mt-2">Send</button>
+    </form>
+
+</div>
+
+</div>
+
+<hr>
+
+<!-- MODE -->
+<h4>Select Mode</h4>
+<button class="btn btn-primary" onclick="showTimer()">Timer</button>
+<button class="btn btn-dark" onclick="showPomodoro()">Pomodoro</button>
+
+<hr>
+
+<!-- TIMER -->
+<div id="timerSection">
+<h4>Timer</h4>
+<h2 id="timer">00:00</h2>
+
+<button onclick="startTimer()" class="btn btn-success">Start</button>
+<button onclick="pauseTimer()" class="btn btn-warning">Pause</button>
+<button onclick="resumeTimer()" class="btn btn-info">Resume</button>
+<button onclick="resetTimer()" class="btn btn-danger">Reset</button>
+</div>
+
+<!-- POMODORO -->
+<div id="pomodoroSection" style="display:none;">
+<h4>Pomodoro</h4>
+
+<h2 id="phaseLabel">Mode: Work</h2>
+<h2 id="pomodoroTimer">00:00</h2>
+
+<input id="workInput" class="form-control mb-2" placeholder="Work min">
+<input id="breakInput" class="form-control mb-2" placeholder="Break min">
+
+<button onclick="startPomodoro()" class="btn btn-success">Start</button>
+<button onclick="pausePomodoro()" class="btn btn-warning">Pause</button>
+<button onclick="resumePomodoro()" class="btn btn-info">Resume</button>
+<button onclick="resetPomodoro()" class="btn btn-danger">Reset</button>
+</div>
+
+<!-- 🔥 SCRIPTLER AYNI KALIYOR -->
+<script>
+
+// 🔥 NOTES AUTO SAVE
+let notesBox = document.getElementById("notes");
+
+if(notesBox){
+    notesBox.addEventListener("input", function(){
+
+        fetch("/save-notes/{{ room.id }}/", {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value,
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: "content=" + encodeURIComponent(notesBox.value)
+        });
+
+    });
+}
+
+// 💬 CHAT
+function sendMessage(){
+
+    let input = document.getElementById("chatInput");
+    let message = input.value;
+
+    if(!message) return;
+
+    fetch("", {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value,
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: "content=" + encodeURIComponent(message)
+    })
+    .then(res => res.json())
+    .then(data => {
+        let chatBox = document.getElementById("chatBox");
+
+        chatBox.innerHTML += `<p><strong>${data.username}:</strong> ${data.content}</p>`;
+
+        input.value = "";
+        chatBox.scrollTop = chatBox.scrollHeight;
+    });
+}
+
+//////////////////////////////////////////////////
+// TIMER + POMODORO
+//////////////////////////////////////////////////
+
+let interval = null;
+let time = 0;
+
+let timeLeft = 0;
+let workTime = 0;
+let breakTime = 0;
+let phase = "work";
+
+function showTimer(){
+    document.getElementById("timerSection").style.display = "block";
+    document.getElementById("pomodoroSection").style.display = "none";
+}
+
+function showPomodoro(){
+    document.getElementById("timerSection").style.display = "none";
+    document.getElementById("pomodoroSection").style.display = "block";
+}
+
+function updateTimer(){
+    let m = Math.floor(time/60);
+    let s = time%60;
+    document.getElementById("timer").innerText =
+        m.toString().padStart(2,"0")+":"+s.toString().padStart(2,"0");
+}
+
+function startTimer(){
+    clearInterval(interval);
+    interval = setInterval(()=>{
+        time++;
+        updateTimer();
+    },1000);
+}
+
+function pauseTimer(){
+    clearInterval(interval);
+}
+
+function resumeTimer(){
+    startTimer();
+}
+
+function resetTimer(){
+    clearInterval(interval);
+    time = 0;
+    updateTimer();
+}
+
+function updatePomodoro(){
+    let m = Math.floor(timeLeft/60);
+    let s = timeLeft%60;
+
+    document.getElementById("pomodoroTimer").innerText =
+        m.toString().padStart(2,"0")+":"+s.toString().padStart(2,"0");
+
+    document.getElementById("phaseLabel").innerText =
+        "Mode: " + phase.toUpperCase();
+}
+
+function startPomodoro(){
+
+    workTime = parseInt(document.getElementById("workInput").value)*60;
+    breakTime = parseInt(document.getElementById("breakInput").value)*60;
+
+    if(!workTime || !breakTime){
+        alert("Enter values");
+        return;
+    }
+
+    phase = "work";
+    timeLeft = workTime;
+
+    clearInterval(interval);
+
+    interval = setInterval(()=>{
+        timeLeft--;
+        updatePomodoro();
+
+        if(timeLeft <= 0){
+            if(phase === "work"){
+                phase = "break";
+                timeLeft = breakTime;
+                alert("Break!");
+            } else {
+                phase = "work";
+                timeLeft = workTime;
+                alert("Work!");
+            }
+        }
+
+    },1000);
+}
+
+function pausePomodoro(){
+    clearInterval(interval);
+}
+
+function resumePomodoro(){
+
+    clearInterval(interval);
+
+    interval = setInterval(()=>{
+        timeLeft--;
+        updatePomodoro();
+
+        if(timeLeft <= 0){
+            if(phase === "work"){
+                phase = "break";
+                timeLeft = breakTime;
+                alert("Break!");
+            } else {
+                phase = "work";
+                timeLeft = workTime;
+                alert("Work!");
+            }
+        }
+
+    },1000);
+}
+
+function resetPomodoro(){
+    clearInterval(interval);
+    timeLeft = 0;
+    updatePomodoro();
+}
+
+</script>
+
+{% endblock %}
